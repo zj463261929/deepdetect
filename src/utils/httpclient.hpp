@@ -1,6 +1,6 @@
 /**
  * DeepDetect
- * Copyright (c) 2015 Emmanuel Benazera
+ * Copyright (c) 2016 Emmanuel Benazera
  * Author: Emmanuel Benazera <beniz@droidnik.fr>
  *
  * This file is part of deepdetect.
@@ -19,10 +19,8 @@
  * along with deepdetect.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <curlpp/cURLpp.hpp>
-#include <curlpp/Easy.hpp>
-#include <curlpp/Options.hpp>
-#include <curlpp/Infos.hpp>
+#define BOOST_NETWORK_ENABLE_HTTPS
+#include <boost/network/include/http/client.hpp>
 
 #ifndef DD_HTTPCLIENT_H
 #define DD_HTTPCLIENT_H
@@ -38,20 +36,22 @@ namespace dd
 			 int &outcode,
 			 std::string &outstr)
     {
-      curlpp::Cleanup cl;
-      std::ostringstream os;
-      curlpp::Easy request;
-      curlpp::options::WriteStream ws(&os);
-      curlpp::options::CustomRequest pr(http_method);
-      request.setOpt(curlpp::options::Url(url));
-      request.setOpt(ws);
-      request.setOpt(pr);
-      request.perform();
-      outstr = os.str();
-      //std::cout << "outstr=" << outstr << std::endl;
-      outcode = curlpp::infos::ResponseCode::get(request);
+      boost::network::http::client client;
+      try {
+	boost::network::http::client::request request(url);
+	boost::network::http::client::response response;
+	if (http_method == "GET")
+	  response = client.get(request);
+	else if (http_method == "DELETE")
+	  response = client.delete_(request);
+	outstr = response.body();
+	outcode = response.status();
+      } catch (std::exception& e) {
+	// deal with exceptions here
+	std::cerr << "http client exception\n";
+      }
     }
-    
+
     static void post_call(const std::string &url,
 			  const std::string &jcontent,
 			  const std::string &http_method,
@@ -59,23 +59,23 @@ namespace dd
 			  std::string &outstr,
 			  const std::string &content_type="Content-Type: application/json")
     {
-      curlpp::Cleanup cl;
-      std::ostringstream os;
-      curlpp::Easy request_put;
-      curlpp::options::WriteStream ws(&os);
-      curlpp::options::CustomRequest pr(http_method);
-      request_put.setOpt(curlpp::options::Url(url));
-      request_put.setOpt(ws);
-      request_put.setOpt(pr);
-      std::list<std::string> header;
-      header.push_back(content_type);
-      request_put.setOpt(curlpp::options::HttpHeader(header));
-      request_put.setOpt(curlpp::options::PostFields(jcontent));
-      request_put.setOpt(curlpp::options::PostFieldSize(jcontent.length()));
-      request_put.perform();
-      outstr = os.str();
-      //std::cout << "outstr=" << outstr << std::endl;
-      outcode = curlpp::infos::ResponseCode::get(request_put);
+      boost::network::http::client client;
+      try
+	{
+	  boost::network::http::client::request request(url);
+	  request << boost::network::header("Content-Type", content_type);
+	  boost::network::http::client::response response;
+	  if (http_method == "PUT")
+	    response = client.put(request,jcontent);
+	  else if (http_method == "POST")
+	    response = client.post(request,jcontent);
+	  outstr = response.body();
+	  outcode = response.status();
+	}
+      catch (std::exception &e)
+	{
+	  std::cerr << "http client post exception\n";
+	}
     }
     
   };
