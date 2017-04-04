@@ -1,5 +1,6 @@
 #FROM nvidia/cuda:7.5-cudnn4-devel
-FROM nvidia/cuda
+#FROM nvidia/cuda
+FROM d46f46109e94
 
 RUN echo 'building GPU DeepDetect image'
 
@@ -12,6 +13,13 @@ RUN ln -sf /dev/stderr /var/log/deepdetect.log
 
 RUN useradd -ms /bin/bash dd
 
+RUN apt-get update
+RUN apt-get install -y software-properties-common python-software-properties
+RUN add-apt-repository ppa:ubuntu-toolchain-r/test
+RUN apt-get update
+RUN apt-get install -y gcc-4.9 g++-4.9
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-4.9
+
 RUN apt-get update && apt-get install -y git cmake build-essential libgoogle-glog-dev libgflags-dev libeigen3-dev libopencv-dev libcppnetlib-dev libboost-dev libboost-iostreams-dev libcurl4-openssl-dev protobuf-compiler libopenblas-dev libhdf5-dev libprotobuf-dev libleveldb-dev libsnappy-dev liblmdb-dev libutfcpp-dev wget unzip
 
 WORKDIR /opt
@@ -19,13 +27,13 @@ RUN git clone https://github.com/jpbarrette/curlpp.git
 WORKDIR /opt/curlpp
 RUN cmake .
 RUN make install
-RUN cp /usr/local/lib/libcurlpp.* /usr/lib/
+RUN cp /usr/local/lib/x86_64-linux-gnu/libcurlpp.* /usr/lib/
 
 WORKDIR /opt
 RUN git clone https://github.com/beniz/deepdetect.git && cd deepdetect && mkdir build
 
 WORKDIR /opt/deepdetect/build
-RUN cmake .. -DUSE_CUDNN=ON -DUSE_XGBOOST=ON
+RUN cmake .. -DUSE_CUDNN=ON -DBUILD_TESTS=ON -DCUDA_ARCH="-gencode arch=compute_60,code=sm_60"
 RUN make
 
 # external volume to be mapped, e.g. for models or training data
